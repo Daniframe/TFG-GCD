@@ -1,65 +1,327 @@
 from __future__ import annotations
 
-#TRANSFORMATIONS
-from textflint.generation.transformation.UT.keyboard import Keyboard
-from textflint.generation.transformation.UT.prejudice import Prejudice
-from textflint.generation.transformation.UT.contraction import Contraction
-from textflint.generation.transformation.UT.insert_adv import InsertAdv
+#PERTURBATIONS
 
-#VALIDATORS
-from textflint.generation.validator.sentence_encoding import SentenceEncoding
+from textflint.input.component.sample.ut_sample import UTSample
+from textflint.generation.transformation.transformation import Transformation
+from textflint.generation.transformation.UT import (
+    Contraction,
+    InsertAdv,
+    Keyboard,
+    Ocr,
+    Prejudice,
+    Punctuation,
+    ReverseNeg,
+    SpellingError,
+    SwapNamedEnt,
+    SwapNum,
+    SwapSynWordNet,
+    Tense,
+    TwitterType,
+    Typos,
+    WordCase
+)
 
 #DATASETS & SAMPLES
 from textflint.input.dataset.dataset import Dataset as TextflintDataset
-from textflint.input.component.sample.sa_sample import SASample
 from textflint.input.component.sample.ut_sample import UTSample
 
 from datasets import Dataset
 
 #MISCELANEOUS
 import numpy as np
+import re
 
-ALLOWED_PERTURBATIONS = {
-    "keyboard" : Keyboard,
-    "prejudice" : Prejudice,
-    "contraction" : Contraction,
-    "insertadv" : InsertAdv
+REMOVE_SPACES_PATTERN = r"([.,!?])\s*"
+
+ALLOWED_CHARACTER_LEVEL_PERTURBATIONS = {
+    "Keyboard" : Keyboard,
+    "Ocr" : Ocr,
+    "SpellingError" : SpellingError,
+    "Typos" : Typos
 }
 
-class Perturbation:
-    def __init__(
-        self, 
-        perturbation: str, 
-        perturbation_args: dict or None = None):
+ALLOWED_WORD_LEVEL_PERTURBATIONS = {
+    "SNE" : SwapNamedEnt,
+    "SSWN" : SwapSynWordNet,
+}
 
-        assert perturbation in ALLOWED_PERTURBATIONS, "Perturbation must be one of the following: " +  ", ".join(ALLOWED_PERTURBATIONS.keys())
+ALLOWED_OTHER_PERTURBATIONS = {
+    "Contraction" : Contraction,
+    "InsertAdv": InsertAdv,
+    "Prejudice" : Prejudice,
+    "Punctuation" : Punctuation,
+    "ReverseNeg" : ReverseNeg,
+    "SwapNum" : SwapNum,
+    "VerbTense" : Tense,
+    "Twitter" : TwitterType,
+    "WordCase" : WordCase
+}
 
-        self.perturbation_name = perturbation
-        self.perturbation_args = perturbation_args
+def text_to_utsample(
+    text: str,
+    x_field_name: str = "x") -> UTSample:
 
-        if perturbation_args is None: #Default kwargs
-            self.perturbation = ALLOWED_PERTURBATIONS[perturbation]()
+    """
+    Transforms a sentence into a textflint UTSample
+
+    Args:
+    ------------------------------------------------------
+    text: str
+        Sentence to transform
+    
+    x_field_name: str, default = "x"
+        Name of the textflint field containing the text.
+        For the majority of the functionalities of
+        textflint to work, this field must be named "x"
+    ------------------------------------------------------
+
+    Returns:
+    ------------------------------------------------------
+    UTSample
+        Textflint Universal Transformation Sample
+    ------------------------------------------------------
+    """
+
+    return UTSample(data = {x_field_name : text})
+
+class CharacterPerturbation:
+    def __init__(self,
+                 perturbation_type: str,
+                 proportion_characters: float,
+                 **kwargs):
+
+        """
+        Perturbation that alters the characters of a sentence
+
+        Args:
+        ------------------------------------------------------
+        proportion_characters: float
+            Number between 0 and 1 representing the % of
+            characters to be altered during the perturbation
+        ------------------------------------------------------
+
+        Returns:
+        ------------------------------------------------------
+        Transformation from the textflint module
+        ------------------------------------------------------
+        """
+        assert perturbation_type in ALLOWED_CHARACTER_LEVEL_PERTURBATIONS, f"'perturbation_type' must be on of the following: {', '.join(list(ALLOWED_CHARACTER_LEVEL_PERTURBATIONS.keys()))}"
+        assert 0 < proportion_characters <= 1, "'proportion_characters' parameter must be a number in (0, 1]"
+
+        self.perturbation = ALLOWED_CHARACTER_LEVEL_PERTURBATIONS[perturbation_type]
+        self.proportion_characters = proportion_characters
+        self.other_args = kwargs
+
+    def apply(self, 
+              sample: UTSample,
+              text_field: str = "x") -> str:
+
+        """
+        Apply a character-level perturbation to a UTSample
+
+        Args:
+        -------------------------------------------------------
+        sample: UTSample
+            Universal Transformation sample from the textflint
+            library. Usually the output of `text_to_utsample`
+
+        text_field: str, default = "x"
+            Name of the text field in the UTSample 
+        -------------------------------------------------------
+
+        Returns:
+        -------------------------------------------------------
+        perturbed_sample: str
+            String representing the perturbed sample. If the
+            sample couldn't be perturbed, it returns the 
+            original sample
+        
+        perturbed: bool
+            Whether the sample was perturbed or not. Mainly
+            used to track the number of perturbed samples
+            in the dataset
+        -------------------------------------------------------
+        """
+        sample_text = sample.dump()[text_field]
+        n_chars_to_change = max(int(len(sample_text) * self.proportion_characters), 1)
+        perturbation = self.perturbation(
+            trans_min = n_chars_to_change,
+            trans_max = n_chars_to_change,
+            trans_p = 1,
+            min_char = 5,
+            **self.other_args
+        )
+
+        perturbed_sample_list = perturbation.transform(sample)
+        if not perturbed_sample_list:
+            # List is empty because perturbation failed: return original sample
+            return sample_text, False
         else:
-            self.perturbation = ALLOWED_PERTURBATIONS[perturbation](**perturbation_args)
+            perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
+            _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
 
-    def __repr__(self):
-        cad = f"{self.perturbation_name} perturbation:\n\n"
-        cad += "Args:"
-        for arg, arg_value in self.perturbation_args.items():
-            cad += f"\n\t{arg} = {arg_value}"
+            if _aux_pert_s == _aux_ori_s:
+                # Even though the sample was 'perturbed', it did not change
+                # any of its contents, so we don't count it as perturbed
+                
+                return sample_text, False
+            else:
+                return perturbed_sample_text, True
 
-        return cad
+class WordPerturbation:
+    def __init__(self,
+                 perturbation_type: str,
+                 proportion_words: float,
+                 **kwargs):
 
-class ExtendedDataset:
-    def __init__(
-        self, 
-        dataset: Dataset, 
-        perturbed: bool = False):
+        """
+        Perturbation that alters the words of a sentence
+
+        Args:
+        ------------------------------------------------------
+        proportion_words: float
+            Number between 0 and 1 representing the % of
+            words to be altered during the perturbation
+        ------------------------------------------------------
+
+        Returns:
+        ------------------------------------------------------
+        Transformation from the textflint module
+        ------------------------------------------------------
+        """
+        assert perturbation_type in ALLOWED_WORD_LEVEL_PERTURBATIONS, f"'perturbation_type' must be on of the following: {', '.join(list(ALLOWED_WORD_LEVEL_PERTURBATIONS.keys()))}"
+        assert 0 < proportion_words <= 1, "'proportion_words' parameter must be a number in (0, 1]"
+
+        self.perturbation = ALLOWED_WORD_LEVEL_PERTURBATIONS[perturbation_type]
+        self.proportion_words = proportion_words
+        self.other_args = kwargs
+
+    def apply(self, 
+              sample: UTSample,
+              text_field: str = "x") -> str:
+
+        """
+        Apply a word-level perturbation to a UTSample
+
+        Args:
+        -------------------------------------------------------
+        sample: UTSample
+            Universal Transformation sample from the textflint
+            library. Usually the output of `text_to_utsample`
+
+        text_field: str, default = "x"
+            Name of the text field in the UTSample 
+        -------------------------------------------------------
+
+        Returns:
+        -------------------------------------------------------
+        perturbed_sample: str
+            String representing the perturbed sample. If the
+            sample couldn't be perturbed, it returns the 
+            original sample
+        
+        perturbed: bool
+            Whether the sample was perturbed or not. Mainly
+            used to track the number of perturbed samples
+            in the dataset
+        -------------------------------------------------------
+        """
+
+        sample_text = sample.dump()[text_field]
+
+        _aux_sample_text = re.sub(r'[^\w\s]', ' ', sample_text)
+        n_words_to_change = max(int(len(_aux_sample_text.split()) * self.proportion_words), 1)
+        perturbation = self.perturbation(
+            trans_min = n_words_to_change,
+            trans_max = n_words_to_change,
+            trans_p = 1,
+            **self.other_args
+        )
+
+        perturbed_sample_list = perturbation.transform(sample)
+        if not perturbed_sample_list:
+            # List is empty because perturbation failed: return original sample
+            return sample_text, False
+        else:
+            perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
+            _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
+
+            if _aux_pert_s == _aux_ori_s:
+                # Even though the sample was 'perturbed', it did not change
+                # any of its contents, so we don't count it as perturbed
+                
+                return sample_text, False
+            else:
+                return perturbed_sample_text, True
+
+class OtherPerturbation:
+    def __init__(self, 
+                 perturbation_type: str, 
+                 **kwargs):
+        
+        assert perturbation_type in ALLOWED_OTHER_PERTURBATIONS, f"'perturbation_type' must be on of the following: {', '.join(list(ALLOWED_OTHER_PERTURBATIONS.keys()))}"
+
+        # Different from char and word-level perturbations: this time
+        # we instantiate the perturbation type instead of referencing
+        # for later isntantiation in the `apply` method. We do this
+        # because in char and word-level perturbations we need the abs.
+        # nº of characters to change, but this is not necesarry in
+        # these types of perturbations
+
+        self.perturbation = ALLOWED_OTHER_PERTURBATIONS[perturbation_type](**kwargs)
+
+    def apply(self, 
+              sample: UTSample,
+              text_field: str = "x") -> str:
+        
+        sample_text = sample.dump()[text_field]
+
+        perturbed_sample_list = self.perturbation.transform(sample)
+        if not perturbed_sample_list:
+            # List is empty because perturbation failed: return original sample
+            return sample_text, False
+        else:
+            perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
+            _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
+
+            if _aux_pert_s == _aux_ori_s:
+                # Even though the sample was 'perturbed', it did not change
+                # any of its contents, so we don't count it as perturbed
+                
+                return sample_text, False
+            else:
+                return perturbed_sample_text, True
+
+
+
+class PerturbedDataset(Dataset):
+    def __init__(self,
+                 dataset: Dataset):
+
+        """
+        Hugginface NLP dataset that allows for alteration of 
+        the input sentences
+
+        Args:
+        ------------------------------------------------------
+        dataset: datasets.Dataset
+            Hugginface dataset loaded from the `datasets`
+            library, with text as inputs
+        ------------------------------------------------------
+
+        Returns:
+        ------------------------------------------------------
+        PerturbedDataset
+        ------------------------------------------------------
+        """
 
         self.dataset = dataset
-        self.perturbed = perturbed
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.dataset.__repr__()
     
     def __getitem__(self, index: int):
@@ -69,16 +331,18 @@ class ExtendedDataset:
         assert isinstance(item, dict), "Item to assign must be a dictionary"
         self.dataset[index] = item
     
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset)
 
-    def copy(self):
-        return ExtendedDataset(dataset = self.dataset, perturbed = self.perturbed)
+    def __iter__(self):
+        return iter(self.dataset)
 
-    def to_textflint_dataset(
-        self, 
+    def copy(self) -> PerturbedDataset:
+        return self.__class__(dataset = self.dataset)
+    
+    def to_textflint_dataset(self, 
         x_field: str = "x",
-        y_field: str = "label") -> TextflintDataset:
+        y_field: str = "y") -> TextflintDataset:
 
         textflint_dataset = TextflintDataset(task = "UT")
         for sample in self.dataset:
@@ -89,67 +353,44 @@ class ExtendedDataset:
             textflint_dataset.append(textflint_sample)
 
         return textflint_dataset
-
-    def map(self, function, **kwargs):
-        return ExtendedDataset(self.dataset.map(function, **kwargs), perturbed = self.perturbed)
-
+    
     def to_tf_dataset(self, **kwargs):
         return self.dataset.to_tf_dataset(**kwargs)
+    
+    def map(self, function, **kwargs) -> PerturbedDataset:
+        return self.__class__(self.dataset.map(function, **kwargs))
 
-    def perturb(
-        self,
-        perturbation: Perturbation,
-        x_fields: list,
-        y_field: str,
-        validation: bool = False,
-        batched: bool = True,
-        batch_size: str or int = "infer",
-        inplace: bool = True) -> None or ExtendedDataset:
+    def perturb(self,
+        perturbation: CharacterPerturbation | WordPerturbation | OtherPerturbation,
+        x_fields: str | list = "x"):
 
-        if self.perturbed and inplace:
-            print("Warning! Dataset is already perturbed and inplace is set to True, so the dataset will be again perturbed")
+        n_perturbed_samples = 0
 
-        if batched:
-            raise Exception("For some god forsaken reason textflint does not work well with batched, so it is disabled for now")
+        if isinstance(x_fields, str):
+            x_fields = [x_fields]
 
-        if batch_size == "infer":
-            batch_size = int(len(self.dataset) * 0.02) #Batches of 2% the whole dataset
+        # Function to apply textflint transformations (perturb the samples)
+        def _map_perturbation(sample, x_fields, perturbation):
 
-        #Function to apply textflint transformations (perturb the samples)
-        def _pert_sample(sample, x_fields, perturbation):
-
-            to_return = {k : None for k in x_fields}
+            _to_return = {k: None for k in x_fields}
+            nonlocal n_perturbed_samples
 
             for x_field in x_fields:
+                # Create UTSample
+                textflint_sample = text_to_utsample(sample[x_field])
 
-                #Transformation
-                textflint_sample = UTSample(data = {"x" : sample[x_field]})
-                perturbed_sample = perturbation.perturbation.transform(textflint_sample)[0].dump()
-
-                #Validation
-                if validation:
-                    ds1 = TextflintDataset()
-                    ds1.append(textflint_sample, sample_id = 0)
-                    ds2 = TextflintDataset()
-                    ds2.append(perturbed_sample, sample_id = 0)
-
-                    validation_score = SentenceEncoding(ds1, ds2, "x").score
-                    to_return["validation_score"] = validation_score
-
-                to_return[x_field] = perturbed_sample["x"]
-
-            return to_return
+                # Apply perturbation
+                perturbed_text_sample, perturbed = perturbation.apply(textflint_sample)
+                if perturbed:
+                    n_perturbed_samples += 1
+                _to_return[x_field] = perturbed_text_sample
+            
+            return _to_return
         
         #Apply the transformations (this is only possible via the map method due
         #to huggingface datasets being immutable and can only be changed by map)
-        ext_dataset = self.dataset.map(
-            lambda x: _pert_sample(x, x_fields, perturbation), 
-            batched = batched, 
-            batch_size = batch_size
+        pert_dataset = self.dataset.map(
+            lambda x: _map_perturbation(x, x_fields, perturbation)
         )
 
-        if not inplace:
-            return ExtendedDataset(ext_dataset, perturbed = False)
-        else:
-            self.dataset = ext_dataset
-            self.perturbed = True
+        return pert_dataset, n_perturbed_samples / len(pert_dataset)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 #PERTURBATIONS
-
 from textflint.input.component.sample.ut_sample import UTSample
 from textflint.generation.transformation.transformation import Transformation
 from textflint.generation.transformation.UT import (
@@ -27,6 +26,10 @@ from textflint.input.dataset.dataset import Dataset as TextflintDataset
 from textflint.input.component.sample.ut_sample import UTSample
 
 from datasets import Dataset
+
+#HUGGINFACE FINE-TUNING DATASET PREPARATIONS
+from transformers import AutoTokenizer, DataCollatorWithPadding, TFAutoModelForSequenceClassification
+from tensorflow import keras
 
 #MISCELANEOUS
 import numpy as np
@@ -84,6 +87,34 @@ def text_to_utsample(
     """
 
     return UTSample(data = {x_field_name : text})
+
+def load_classifier_model(
+    checkpoint: str,
+    num_labels: int) -> object:
+
+    return TFAutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels = num_labels)
+
+def configure_dynamic_lr(
+    scheduler_fn: function,
+    num_train_steps: int) -> object:
+
+    lr_scheduler = scheduler_fn(
+        initial_learning_rate = 5e-5,
+        end_learning_rate = 0.0,
+        decay_steps = num_train_steps)
+    
+    return keras.optimizers.Adam(learning_rate = lr_scheduler)
+
+def save_model_result(
+    model: object,
+    train_dataset: object,
+    train_dataset_reference: object,
+    test_dataset: object,
+    test_dataset_reference: object,
+    configuration: dict,
+    namefile: str) -> None:
+
+    pass
 
 class CharacterPerturbation:
     def __init__(self,
@@ -297,7 +328,6 @@ class OtherPerturbation:
                 return perturbed_sample_text, True
 
 
-
 class PerturbedDataset(Dataset):
     def __init__(self,
                  dataset: Dataset):
@@ -394,3 +424,38 @@ class PerturbedDataset(Dataset):
         )
 
         return pert_dataset, n_perturbed_samples / len(pert_dataset)
+
+    def to_processed_nlp_dataset(
+        self, 
+        checkpoint: str, 
+        x_fields: str | list = "x",
+        y_fields: str | list = "y",
+        return_tensors: str = "tf",
+        batched: bool = True,
+        shuffle: bool = True,
+        batch_size: int = 32):
+
+        if isinstance(x_fields, str):
+            x_fields = [x_fields]
+
+        if isinstance(y_fields, str):
+            y_fields = [y_fields]
+
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+        def _tok_map(sample):
+            fields = []
+            for x_field in x_fields:
+                fields.append(sample[x_field])
+            return tokenizer(*fields, truncation = True)
+        
+        tokenized_dataset = self.dataset.map(_tok_map, batched = batched)
+        data_collator = DataCollatorWithPadding(tokenizer = tokenizer, return_tensors = return_tensors)
+
+        return tokenized_dataset.to_tf_dataset(
+            columns = ["attention_mask", "input_ids", "token_type_ids"],
+            label_cols = y_fields,
+            shuffle = shuffle,
+            collate_fn = data_collator,
+            batch_size = batch_size
+        )

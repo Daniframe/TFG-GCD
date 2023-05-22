@@ -1,4 +1,5 @@
 from __future__ import annotations
+from numpy.typing import ArrayLike
 
 #PERTURBATIONS
 from textflint.input.component.sample.ut_sample import UTSample
@@ -105,16 +106,17 @@ def configure_dynamic_lr(
     
     return keras.optimizers.Adam(learning_rate = lr_scheduler)
 
-def save_model_result(
-    model: object,
-    train_dataset: object,
-    train_dataset_reference: object,
-    test_dataset: object,
-    test_dataset_reference: object,
-    configuration: dict,
-    namefile: str) -> None:
+def save_model_result_csv(
+    observed: ArrayLike,
+    namefile: str,
+    label = "label") -> None:
 
-    pass
+    cad = f"index;{label}\n"
+    for i, value in enumerate(observed):
+        cad += f"{i};{value}\n"
+    
+    with open(namefile, "w", encoding = "utf-8") as file:
+        file.write(cad)
 
 class CharacterPerturbation:
     def __init__(self,
@@ -187,9 +189,10 @@ class CharacterPerturbation:
         perturbed_sample_list = perturbation.transform(sample)
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
-            return sample_text, False
+            return sample_text
         else:
             perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            return perturbed_sample_text
             _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
             _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
 
@@ -274,9 +277,10 @@ class WordPerturbation:
         perturbed_sample_list = perturbation.transform(sample)
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
-            return sample_text, False
+            return sample_text
         else:
             perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            return perturbed_sample_text
             _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
             _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
 
@@ -313,9 +317,10 @@ class OtherPerturbation:
         perturbed_sample_list = self.perturbation.transform(sample)
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
-            return sample_text, False
+            return sample_text
         else:
             perturbed_sample_text = perturbed_sample_list[0].dump()[text_field]
+            return perturbed_sample_text
             _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
             _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
 
@@ -323,9 +328,9 @@ class OtherPerturbation:
                 # Even though the sample was 'perturbed', it did not change
                 # any of its contents, so we don't count it as perturbed
                 
-                return sample_text, False
+                return sample_text
             else:
-                return perturbed_sample_text, True
+                return perturbed_sample_text
 
 
 class PerturbedDataset(Dataset):
@@ -403,25 +408,50 @@ class PerturbedDataset(Dataset):
         def _map_perturbation(sample, x_fields, perturbation):
 
             _to_return = {k: None for k in x_fields}
-            nonlocal n_perturbed_samples
 
             for x_field in x_fields:
                 # Create UTSample
                 textflint_sample = text_to_utsample(sample[x_field])
 
                 # Apply perturbation
-                perturbed_text_sample, perturbed = perturbation.apply(textflint_sample)
-                if perturbed:
-                    n_perturbed_samples += 1
+                perturbed_text_sample = perturbation.apply(textflint_sample)
+
+                # Check if sample was actually perturbed
+
                 _to_return[x_field] = perturbed_text_sample
             
             return _to_return
         
+        #Kinda silly, but when mapping the function, if any model for the
+        #perturbation to work needs to be downloaded, working with GPU gives
+        #funky outputs (like the model is being downloaded) from different
+        #processes? Let's just apply the transformation to the first sample
+        #and then to the whole dataset
+
+        void = _map_perturbation(self.dataset[0], x_fields, perturbation)
+
         #Apply the transformations (this is only possible via the map method due
         #to huggingface datasets being immutable and can only be changed by map)
-        pert_dataset = self.dataset.map(
+        pert_dataset = PerturbedDataset(
+            dataset = self.dataset.map(
             lambda x: _map_perturbation(x, x_fields, perturbation)
-        )
+            ))
+        
+        #Check if samples were actually perturbed:
+        for i, sample in enumerate(pert_dataset):
+            perturbed = True
+            for field in x_fields:
+                sample_text = self.dataset[i][field]
+                perturbed_sample_text = sample[field]
+
+                _aux_pert_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", perturbed_sample_text)
+                _aux_ori_s = re.sub(REMOVE_SPACES_PATTERN, r"\1", sample_text)
+
+                if _aux_pert_s == _aux_ori_s:
+                    perturbed = False
+                    break
+            if perturbed:
+                n_perturbed_samples += 1
 
         return pert_dataset, n_perturbed_samples / len(pert_dataset)
 

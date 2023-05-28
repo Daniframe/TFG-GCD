@@ -26,13 +26,14 @@ from textflint.generation.transformation.UT import (
 from textflint.input.dataset.dataset import Dataset as TextflintDataset
 from textflint.input.component.sample.ut_sample import UTSample
 
-from datasets import Dataset
+from datasets import Dataset, concatenate_datasets
 
 #HUGGINFACE FINE-TUNING DATASET PREPARATIONS
 from transformers import AutoTokenizer, DataCollatorWithPadding, TFAutoModelForSequenceClassification
 from tensorflow import keras
 
 #MISCELANEOUS
+from collections import Counter
 import numpy as np
 import re
 
@@ -97,10 +98,11 @@ def load_classifier_model(
 
 def configure_dynamic_lr(
     scheduler_fn: function,
+    initial_learning_rate: float,
     num_train_steps: int) -> object:
 
     lr_scheduler = scheduler_fn(
-        initial_learning_rate = 5e-5,
+        initial_learning_rate = initial_learning_rate,
         end_learning_rate = 0.0,
         decay_steps = num_train_steps)
     
@@ -375,6 +377,28 @@ class PerturbedDataset(Dataset):
     def copy(self) -> PerturbedDataset:
         return self.__class__(dataset = self.dataset)
     
+    def subsample(self,
+        n: int = 10_000,
+        y_field: str = "label",
+        seed = 8888) -> PerturbedDataset:
+        
+        np.random.seed(seed)
+        
+        label_counts = Counter(self.dataset[y_field])
+        n_rows = len(self.dataset)
+        
+        to_concat = []
+        
+        for key in label_counts:
+            proportion = label_counts[key] / n_rows
+            rows_to_select = int(proportion * n)
+            label_dataset = self.dataset.filter(lambda x: x[y_field] == key)
+            
+            indexes = np.random.choice(a = np.arange(len(label_dataset)), size = rows_to_select, replace = False)
+            to_concat.append(self.dataset.select(indexes))
+        
+        return concatenate_datasets(to_concat).shuffle(seed = seed)
+        
     def to_textflint_dataset(self, 
         x_field: str = "x",
         y_field: str = "y") -> TextflintDataset:
@@ -462,8 +486,12 @@ class PerturbedDataset(Dataset):
         y_fields: str | list = "y",
         return_tensors: str = "tf",
         batched: bool = True,
-        shuffle: bool = True,
-        batch_size: int = 32):
+        shuffle: bool = False,
+        batch_size: int = 32,
+        candidate_cols: list | None = None):
+
+        if candidate_cols is None:
+            candidate_cols = ["attention_mask", "input_ids", "token_type_ids"]
 
         if isinstance(x_fields, str):
             x_fields = [x_fields]
@@ -482,8 +510,18 @@ class PerturbedDataset(Dataset):
         tokenized_dataset = self.dataset.map(_tok_map, batched = batched)
         data_collator = DataCollatorWithPadding(tokenizer = tokenizer, return_tensors = return_tensors)
 
+        # Check, because some models do not return all three columns:
+        # - attention_mask
+        # - input_ids
+        # - token_type_ids
+
+        cols = []
+        for col in candidate_cols:
+            if col in tokenized_dataset.features:
+                cols.append(col)
+
         return tokenized_dataset.to_tf_dataset(
-            columns = ["attention_mask", "input_ids", "token_type_ids"],
+            columns = cols,
             label_cols = y_fields,
             shuffle = shuffle,
             collate_fn = data_collator,

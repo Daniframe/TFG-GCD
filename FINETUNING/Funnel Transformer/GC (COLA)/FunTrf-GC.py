@@ -56,7 +56,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
     # Model: Funnel Transformer with a classification head of 2 classes
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels = 2)
 
-    # Computation of metrics: accuracy f1 score to deal with imbalanced datasts
+    # Computation of metrics: accuracy and f1 score to deal with imbalanced datasts
     def compute_metrics(pred):
         labels = pred.label_ids
         preds = pred.predictions.argmax(-1)
@@ -89,7 +89,10 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         compute_metrics = compute_metrics
     )
 
-    trainer.add_callback(CustomCallback(trainer))
+    # Uncomment the following line if you want to compute the metrics
+    # for the training dataset each epoch
+
+    # trainer.add_callback(CustomCallback(trainer))
     trainer.train()
 
     preds_train = trainer.predict(cola_train)
@@ -101,9 +104,11 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
     train_f1 = preds_train.metrics["test_f1"]
     val_f1 = preds_val.metrics["test_f1"]
 
+    # Custom score: 20% f1-score train, 80% f1-score validation
     score = 0.2 * train_f1 + 0.8 * val_f1
     cad_scores += f"{ini_lr};{n_ep};{score}\n"
 
+    # Adhering to good practices in ML: providing results to avoid recomputation
     with open(rf"./FunTrf-GC_lr-{ini_lr}_nep-{n_ep}_train.csv", "w", encoding = "utf-8") as f:
 
         if first_train:

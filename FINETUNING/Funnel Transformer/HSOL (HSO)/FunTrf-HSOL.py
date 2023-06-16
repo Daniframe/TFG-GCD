@@ -135,7 +135,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         for i in range(len(hso_val)):
             f.write(f"{i};{predicted_labels_val[i]}\n")
 
-    with open(rf"./FunTrf-HSOL_hyperparamter_evaluation.csv", "a", encoding = "utf-8") as f:
+    with open(rf"./FunTrf-HSOL_hyperparameter_evaluation.csv", "a", encoding = "utf-8") as f:
         f.write(cad_scores)
     
     cad_scores = ""

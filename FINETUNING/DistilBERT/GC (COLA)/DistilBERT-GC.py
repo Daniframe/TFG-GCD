@@ -10,7 +10,6 @@ from sklearn.metrics import f1_score, accuracy_score
 from datasets import load_dataset
 from itertools import product
 from copy import deepcopy
-import numpy as np
 import torch
 
 # Custom callback to also obtain the metrics of the training dataset
@@ -59,7 +58,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
     # Model: DistilBERT with a classification head of 2 classes
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels = 2)
 
-    # Computation of metrics: f1 score to deal with imbalanced datasts
+    # Computation of metrics: accuracy and f1 score to deal with imbalanced datasts
     def compute_metrics(pred):
         labels = pred.label_ids
         preds = pred.predictions.argmax(-1)
@@ -92,7 +91,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         compute_metrics = compute_metrics
     )
 
-    # Uncomment this line if you want to compute the metrics
+    # Uncomment the following line if you want to compute the metrics
     # for the training dataset each epoch
 
     # trainer.add_callback(CustomCallback(trainer))
@@ -130,7 +129,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         for i in range(len(cola_val)):
             f.write(f"{cola_val[i]['idx']};{predicted_labels_val[i]}\n")
 
-    with open(rf"./DistilBERT-GC_hyperparameter_evaluation.csv", "a", encoding = "utf-8") as f:
+    with open(rf"./DistilBERT-GC_hyperparamter_evaluation.csv", "a", encoding = "utf-8") as f:
         f.write(cad_scores)
     
     cad_scores = ""

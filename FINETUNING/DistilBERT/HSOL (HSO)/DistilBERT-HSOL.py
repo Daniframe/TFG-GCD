@@ -1,16 +1,13 @@
 import os
 
-# Using only one GPU
+# Using only one GPU to avoid congestion on the server
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-current_dir = os.getcwd()
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments, TrainerCallback
 from sklearn.metrics import f1_score, accuracy_score
 from datasets import load_dataset
 from itertools import product
 from copy import deepcopy
-import numpy as np
 import torch
 
 # Custom callback to also obtain the metrics of the training dataset
@@ -36,13 +33,13 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
 # Function to use in map: tokenization
 def tok_map(sample):
-    return tokenizer(sample["tweet"], truncation = True, padding = "max_length")#, max_length = 96)
+    return tokenizer(sample["tweet"], truncation = True, padding = "max_length")
 
 # Tokenization and preparation of dataset to the trainer
 tokenized_dataset = hso_temp.map(tok_map, batched = True)
 tokenized_dataset = tokenized_dataset.rename_column("class", "labels")
 
-# Train validation test partition
+# Train-validation-test partition: (55-25-20)
 hso = tokenized_dataset["train"]
 aux_hso = hso.train_test_split(test_size = 0.2, seed = 8888, stratify_by_column = "labels")
 hso_test = aux_hso["test"]
@@ -98,9 +95,9 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         compute_metrics = compute_metrics
     )
 
-    # Uncomment this line if you want to compute the metrics
+    # Uncomment the following line if you want to compute the metrics
     # for the training dataset each epoch
-    
+
     # trainer.add_callback(CustomCallback(trainer))
     trainer.train()
 
@@ -136,7 +133,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         for i in range(len(hso_val)):
             f.write(f"{i};{predicted_labels_val[i]}\n")
 
-    with open(rf"./DistilBERT-HSOL_hyperparamter_evaluation.csv", "a", encoding = "utf-8") as f:
+    with open(rf"./DistilBERT-HSOL_hyperparameter_evaluation.csv", "a", encoding = "utf-8") as f:
         f.write(cad_scores)
     
     cad_scores = ""

@@ -1,20 +1,13 @@
 import os
 
-# Using only one GPU, they are being friendly enough
-# to let me use the server, don't get greedy :D
+# Using only one GPU to avoid server congestion
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-remote_username = "daniroalv"
-remote_host = "falco.dsic.upv.es"
-current_dir = os.getcwd()
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments, TrainerCallback
 from sklearn.metrics import f1_score, accuracy_score
 from datasets import load_dataset
 from itertools import product
 from copy import deepcopy
-import numpy as np
-import subprocess
 import torch
 
 # Custom callback to also obtain the metrics of the training dataset
@@ -60,10 +53,10 @@ first_val = True
 
 for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
 
-    # Model: DistilBERT with a classification head of 2 classes
+    # Model: Funnel Transformer with a classification head of 2 classes
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels = 2)
 
-    # Computation of metrics: f1 score to deal with imbalanced datasts
+    # Computation of metrics: accuracy f1 score to deal with imbalanced datasts
     def compute_metrics(pred):
         labels = pred.label_ids
         preds = pred.predictions.argmax(-1)
@@ -129,7 +122,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         for i in range(len(cola_val)):
             f.write(f"{cola_val[i]['idx']};{predicted_labels_val[i]}\n")
 
-    with open(rf"./FunTrf-GC_hyperparamter_evaluation.csv", "a", encoding = "utf-8") as f:
+    with open(rf"./FunTrf-GC_hyperparameter_evaluation.csv", "a", encoding = "utf-8") as f:
         f.write(cad_scores)
     
     cad_scores = ""

@@ -36,8 +36,6 @@ from transformers import (
     TextClassificationPipeline
 )
 
-from tensorflow import keras
-
 #MISCELANEOUS
 from collections import Counter
 import numpy as np
@@ -129,17 +127,17 @@ def load_classifier_model(
 
     return TFAutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels = num_labels)
 
-def configure_dynamic_lr(
-    scheduler_fn: function,
-    initial_learning_rate: float,
-    num_train_steps: int) -> object:
+# def configure_dynamic_lr(
+#     scheduler_fn: function,
+#     initial_learning_rate: float,
+#     num_train_steps: int) -> object:
 
-    lr_scheduler = scheduler_fn(
-        initial_learning_rate = initial_learning_rate,
-        end_learning_rate = 0.0,
-        decay_steps = num_train_steps)
+#     lr_scheduler = scheduler_fn(
+#         initial_learning_rate = initial_learning_rate,
+#         end_learning_rate = 0.0,
+#         decay_steps = num_train_steps)
     
-    return keras.optimizers.Adam(learning_rate = lr_scheduler)
+    # return keras.optimizers.Adam(learning_rate = lr_scheduler)
 
 def predict_dataset(
     dataset: Dataset,

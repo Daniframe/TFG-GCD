@@ -29,7 +29,13 @@ from textflint.input.component.sample.ut_sample import UTSample
 from datasets import Dataset, concatenate_datasets
 
 #HUGGINFACE FINE-TUNING DATASET PREPARATIONS
-from transformers import AutoTokenizer, DataCollatorWithPadding, TFAutoModelForSequenceClassification
+from transformers import (
+    AutoTokenizer, 
+    DataCollatorWithPadding, 
+    TFAutoModelForSequenceClassification, 
+    TextClassificationPipeline
+)
+
 from tensorflow import keras
 
 #MISCELANEOUS
@@ -62,6 +68,33 @@ ALLOWED_OTHER_PERTURBATIONS = {
     "Twitter" : TwitterType,
     "WordCase" : WordCase
 }
+
+def show_dataset_info(dataset, y_field: str = "label"):
+  print("Nº of samples per split:")
+  n_splits = 0
+  for split in dataset:
+    if len(dataset[split]) > 15000:
+      aux_cad = " (Exceeds computation limit! Subsampling needed)"
+    else:
+      aux_cad = ""
+    n_splits += 1
+    print(f"\t{split}: {len(dataset[split])}{aux_cad}")
+
+  if n_splits < 2:
+      if n_splits == 2:
+        cad = "f\nOnly 2 splits were found. A train_test_partition is required"
+      else:
+        cad = f"\nOnly 1 split was found. A train_test_partition is required"
+        
+      print(cad)
+
+  print("\nLabel distribution per split:")
+  for split in dataset:
+    label_dist = dict(Counter(dataset[split][y_field]))
+    for label in label_dist:
+      proportion = label_dist[label] / len(dataset[split])
+      print(f"\tClass {label} : {proportion:.2%}")
+    print()
 
 def text_to_utsample(
     text: str,
@@ -107,6 +140,21 @@ def configure_dynamic_lr(
         decay_steps = num_train_steps)
     
     return keras.optimizers.Adam(learning_rate = lr_scheduler)
+
+def predict_dataset(
+    dataset: Dataset,
+    pipe: TextClassificationPipeline,
+    x_field: str = "sentence",
+    score_field: str = "score") -> list:
+    
+    to_return = []
+    predictions = pipe(dataset[x_field])
+    for sample in predictions:
+        most_likely_label = max(sample, key = lambda x: x[score_field])
+        label = int(re.findall(r"LABEL_(\d+)", most_likely_label["label"])[0])
+        to_return.append(label)
+
+    return to_return
 
 def save_model_result_csv(
     observed: ArrayLike,
@@ -396,6 +444,9 @@ class PerturbedDataset(Dataset):
             
             indexes = np.random.choice(a = np.arange(len(label_dataset)), size = rows_to_select, replace = False)
             to_concat.append(self.dataset.select(indexes))
+        
+        # Reset numpy seed, we don't want deterministism from now on
+        np.random.seed()
         
         return concatenate_datasets(to_concat).shuffle(seed = seed)
         

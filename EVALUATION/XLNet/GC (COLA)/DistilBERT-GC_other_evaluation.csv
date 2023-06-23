@@ -1,0 +1,10 @@
+type;percentage_perturbation;kappa
+Contraction;0.9855980403580031
+InsertAdv;0.36490611953456853
+Prejudice;1.0
+Punctuation;0.8363981485703862
+ReverseNeg;0.34080505020241225
+SwapNum;1.0
+VerbTense;0.3839195648107051
+Twitter;0.7576268867709426
+WordCase;0.0032270327349523953

@@ -1,4 +1,4 @@
-type;percentage_perturbation;percentage_altered;kappa
+type;percentage_perturbation;kappa
 SNE;0.1;0.8935941853287436
 SNE;0.2;0.8802766797333195
 SNE;0.3;0.8841209634364842

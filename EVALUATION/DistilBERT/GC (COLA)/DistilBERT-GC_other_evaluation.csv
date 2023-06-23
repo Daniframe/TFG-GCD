@@ -1,4 +1,4 @@
-type;percentage_perturbation;kappa
+type;kappa
 Contraction;0.9855980403580031
 InsertAdv;0.36490611953456853
 Prejudice;1.0

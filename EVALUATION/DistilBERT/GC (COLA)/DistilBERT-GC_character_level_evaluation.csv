@@ -1,4 +1,4 @@
-type;percentage_perturbation;percentage_altered;kappa
+type;percentage_perturbation;kappa
 Keyboard;0.01;0.4146452243047377
 Keyboard;0.05;0.27676086010513
 Keyboard;0.1;0.08092794685222426

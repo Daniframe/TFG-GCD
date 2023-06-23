@@ -31,7 +31,7 @@ predictions_normal = Trf2.predict_dataset(
     pipe = pipeline,
     x_fields = "sentence")
 
-cad = "type;percentage_perturbation;percentage_altered;kappa\n"
+cad = "type;percentage_perturbation;kappa\n"
 for perturbation in Trf2.ALLOWED_CHARACTER_LEVEL_PERTURBATIONS:
     for perturbation_proportion in [0.01, 0.05, 0.1]:
         perturbed_dataset = load_from_disk(
@@ -48,7 +48,7 @@ for perturbation in Trf2.ALLOWED_CHARACTER_LEVEL_PERTURBATIONS:
 with open(f"DistilBERT-GC_character_level_evaluation.csv", "w") as file:
     file.write(cad)
 
-cad = "type;percentage_perturbation;percentage_altered;kappa\n"
+cad = "type;percentage_perturbation;kappa\n"
 for perturbation in Trf2.ALLOWED_WORD_LEVEL_PERTURBATIONS:
     for perturbation_proportion in [0.1, 0.2, 0.3]:
         perturbed_dataset = load_from_disk(
@@ -65,7 +65,7 @@ for perturbation in Trf2.ALLOWED_WORD_LEVEL_PERTURBATIONS:
 with open(f"DistilBERT-GC_word_level_evaluation.csv", "w") as file:
     file.write(cad)
 
-cad = "type;percentage_perturbation;kappa\n"
+cad = "type;kappa\n"
 for perturbation in Trf2.ALLOWED_OTHER_PERTURBATIONS:
     perturbed_dataset = load_from_disk(
         f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}")

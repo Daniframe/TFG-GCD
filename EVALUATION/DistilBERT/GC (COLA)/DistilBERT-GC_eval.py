@@ -1,17 +1,17 @@
 import os
 import sys
 
-# Using only one GPU, they are being friendly enough
-# to let me use the server, don't get greedy :D
+# Using only one GPU to avoid server congestion
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # To find my library
+# Obviously change the path to where your environment is located
 sys.path.append("/home/daniroalv/miniconda3/envs/CodigoTFG/CodigoTFG")
 
 from transformers import (
     AutoModelForSequenceClassification,
-    AutoTokenizer,
-    TextClassificationPipeline
+    TextClassificationPipeline,
+    AutoTokenizer
 )
 
 from sklearn.metrics import cohen_kappa_score
@@ -31,12 +31,23 @@ predictions_normal = Trf2.predict_dataset(
     pipe = pipeline,
     x_fields = "sentence")
 
-# CHARACTER LEVEL PERTURBATIONS
-cad = "type;percentage_perturbation;kappa\n"
+cad = "type;percentage_perturbation;percentage_altered;kappa\n"
 for perturbation in Trf2.ALLOWED_CHARACTER_LEVEL_PERTURBATIONS:
     for perturbation_proportion in [0.01, 0.05, 0.1]:
-        perturbed_dataset = load_from_disk(
-            f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}_{perturbation_proportion}")
+
+        # The perturbed datasets are available in huggingface
+        # in the username DaniFrame, in this case ColaPerturbed:
+        # You can load the dataset as follows:
+
+        perturbed_dataset = load_dataset(
+            "DaniFrame/ColaPerturbed", 
+            split = f"cola_perturbed_{perturbation.lower()}_{perturbation_proportion}"
+        )
+
+        # Alternatively, if you have them in disk, use this:
+
+        # perturbed_dataset = load_from_disk(
+        #     f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}_{perturbation_proportion}")
         
         predictions_perturbed = Trf2.predict_dataset(
             dataset = perturbed_dataset,
@@ -49,12 +60,17 @@ for perturbation in Trf2.ALLOWED_CHARACTER_LEVEL_PERTURBATIONS:
 with open(f"DistilBERT-GC_character_level_evaluation.csv", "w") as file:
     file.write(cad)
 
-# WORD LEVEL PERTURBATIONS
-cad = "type;percentage_perturbation;kappa\n"
+cad = "type;percentage_perturbation;percentage_altered;kappa\n"
 for perturbation in Trf2.ALLOWED_WORD_LEVEL_PERTURBATIONS:
     for perturbation_proportion in [0.1, 0.2, 0.3]:
-        perturbed_dataset = load_from_disk(
-            f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}_{perturbation_proportion}")
+
+        perturbed_dataset = load_dataset(
+            "DaniFrame/ColaPerturbed", 
+            split = f"cola_perturbed_{perturbation.lower()}_{perturbation_proportion}"
+        )
+
+        # perturbed_dataset = load_from_disk(
+        #     f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}_{perturbation_proportion}")
 
         predictions_perturbed = Trf2.predict_dataset(
             dataset = perturbed_dataset,
@@ -67,11 +83,16 @@ for perturbation in Trf2.ALLOWED_WORD_LEVEL_PERTURBATIONS:
 with open(f"DistilBERT-GC_word_level_evaluation.csv", "w") as file:
     file.write(cad)
 
-# OTHER PERTURBATIONS
-cad = "type;kappa\n"
+cad = "type;percentage_perturbation;kappa\n"
 for perturbation in Trf2.ALLOWED_OTHER_PERTURBATIONS:
-    perturbed_dataset = load_from_disk(
-        f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}")
+
+    perturbed_dataset = load_dataset(
+        "DaniFrame/ColaPerturbed", 
+        split = f"cola_perturbed_{perturbation.lower()}"
+    )
+
+    # perturbed_dataset = load_from_disk(
+    #     f"../../cola_perturbed/cola_perturbed_{perturbation.lower()}")
 
     predictions_perturbed = Trf2.predict_dataset(
         dataset = perturbed_dataset,

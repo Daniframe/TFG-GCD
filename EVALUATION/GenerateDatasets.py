@@ -1,18 +1,12 @@
 import os
 import sys
 
-# Using only one GPU, they are being friendly enough
-# to let me use the server, don't get greedy :D
+# Using only one GPU to vaoid server congestion
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # To find my library
+# Obviously change the path to where your environment is located
 sys.path.append("/home/daniroalv/miniconda3/envs/CodigoTFG/CodigoTFG")
-
-from transformers import (
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    TextClassificationPipeline
-)
 
 from sklearn.metrics import cohen_kappa_score
 from datasets import load_dataset, DatasetDict
@@ -85,6 +79,7 @@ for i, test_dataset in enumerate([cola_test, mnli_test, sst2_test, paws_test, hs
         cad += f"{dataset_names[i]}_{perturbation.lower()};-;{percentage_altered}\n"
         dataset_dict[f"{dataset_names[i]}_perturbed_{perturbation.lower()}_{percentage_perturbation}"] = test_pert.dataset
 
+    # [dataset]_perturbed.csv contains the % of perturbed samples per perturbation
     with open(f"{dataset_names[i]}_perturbed.csv", "w") as file:
         file.write(cad)
 

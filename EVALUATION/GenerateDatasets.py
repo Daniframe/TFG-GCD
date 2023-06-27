@@ -88,4 +88,8 @@ for i, test_dataset in enumerate([cola_test, mnli_test, sst2_test, paws_test, hs
     with open(f"{dataset_names[i]}_perturbed.csv", "w") as file:
         file.write(cad)
 
+    # This will save the dataset in disk, but they are also available
+    # in Hugginface in the username DaniFrame
+    
+    # If you want to upload them to Hugginface, use dataset_dict.push_to_hub(path)
     dataset_dict.save_to_disk(f"{dataset_names[i]}_perturbed")

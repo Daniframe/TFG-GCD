@@ -1,4 +1,4 @@
-# Code of 'Evaluation of Large Langauge Models robustness against perturbed inputs' 
+# Code of 'Model robustness under data distribution shifts. Analysing and predicting the impact of text perturbations on NLP models' 
 Code employed for my Final Year Project in Data Science 'Model robustness under data distribution shifts. Analysing and predicting the impact of text perturbations on NLP models' conducted in the Univeristat Politècnica de València (UPV)
 
 ------

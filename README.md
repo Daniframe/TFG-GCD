@@ -7,4 +7,9 @@ Large language models are usually trained using curated datasets, which lack imp
 
 Keywords : Natural Language Processing, text perturbation, robustness, transformers, natural language inference, sentiment analysis, hate speech and offensive language, semantic similarity, linguistic acceptability
 
-To be redacted :)
+------
+
+The repository is organised as follows:
+
+- FINETUNING: code and results for the finetuning phase, including instance-level results
+- EVALUATION: code and results for the evaluation phase

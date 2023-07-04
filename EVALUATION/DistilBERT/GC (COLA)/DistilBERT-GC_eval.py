@@ -18,6 +18,8 @@ from sklearn.metrics import cohen_kappa_score
 from datasets import load_dataset, load_from_disk
 import Transformations as Trf2
 
+# You will need a saved checkpoint to load the model. The one used here is in:
+# https://drive.google.com/drive/folders/1rZ_JHXsZQG_VM5Lkbveufm4blSGhymXY?usp=sharing
 best_model = AutoModelForSequenceClassification.from_pretrained(
     "DistilBERT-GC_lr-5e-05_nep-10/checkpoint-2680")
 

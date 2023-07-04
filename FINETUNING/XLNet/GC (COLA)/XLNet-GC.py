@@ -127,7 +127,7 @@ for n_ep, ini_lr in product(n_epochs, ini_learning_rate):
         for i in range(len(cola_val)):
             f.write(f"{cola_val[i]['idx']};{predicted_labels_val[i]}\n")
 
-    with open(rf"./XLNet-GC_hyperparamter_evaluation.csv", "a", encoding = "utf-8") as f:
+    with open(rf"./XLNet-GC_hyperparameter_evaluation.csv", "a", encoding = "utf-8") as f:
         f.write(cad_scores)
     
     cad_scores = ""

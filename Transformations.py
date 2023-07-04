@@ -37,9 +37,13 @@ from transformers import (
 )
 
 #MISCELANEOUS
+from transformers.pipelines.pt_utils import KeyDataset, KeyPairDataset
 from collections import Counter
+from tqdm.auto import tqdm
 import numpy as np
 import re
+
+from textflint.common.utils.error import FlintError
 
 REMOVE_SPACES_PATTERN = r"([.,!?])\s*"
 
@@ -137,22 +141,40 @@ def load_classifier_model(
 #         end_learning_rate = 0.0,
 #         decay_steps = num_train_steps)
     
-    # return keras.optimizers.Adam(learning_rate = lr_scheduler)
+#     return keras.optimizers.Adam(learning_rate = lr_scheduler)
 
 def predict_dataset(
     dataset: Dataset,
     pipe: TextClassificationPipeline,
-    x_field: str = "sentence",
-    score_field: str = "score") -> list:
+    x_fields: str = "sentence",
+    score_field: str = "score",
+    mode: str = "single",
+    exclude_samples: list | None = None) -> list:
     
-    to_return = []
-    predictions = pipe(dataset[x_field])
-    for sample in predictions:
-        most_likely_label = max(sample, key = lambda x: x[score_field])
-        label = int(re.findall(r"LABEL_(\d+)", most_likely_label["label"])[0])
-        to_return.append(label)
+    if exclude_samples is None:
+        exclude_samples = []
 
-    return to_return
+    indices = sorted(list(set(np.arange(0, len(dataset))) - set(exclude_samples)))
+
+    predictions = []
+    if mode == "single":
+        for sample in tqdm(pipe(KeyDataset(dataset.select(indices), x_fields))):
+            try:
+                label = int(re.findall(r"LABEL_(\d+)", sample[0]["label"])[0])
+                predictions.append(label)
+            except RuntimeError:
+                pass
+    else:
+        assert isinstance(x_fields, list), "When mode is not 'single', x_fields must be a list"
+        field1, field2 = x_fields
+        for sample in tqdm(pipe(KeyPairDataset(dataset.select(indices), field1, field2))):
+            try:
+                label = int(re.findall(r"LABEL_(\d+)", sample[0]["label"])[0])
+                predictions.append(label)
+            except RuntimeError:
+                pass
+
+    return predictions
 
 def save_model_result_csv(
     observed: ArrayLike,
@@ -234,7 +256,11 @@ class CharacterPerturbation:
             **self.other_args
         )
 
-        perturbed_sample_list = perturbation.transform(sample)
+        try:
+            perturbed_sample_list = perturbation.transform(sample)
+        except FlintError:
+            return sample_text
+        
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
             return sample_text
@@ -322,7 +348,11 @@ class WordPerturbation:
             **self.other_args
         )
 
-        perturbed_sample_list = perturbation.transform(sample)
+        try:
+            perturbed_sample_list = perturbation.transform(sample)
+        except FlintError:
+            return sample_text
+            
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
             return sample_text
@@ -362,7 +392,11 @@ class OtherPerturbation:
         
         sample_text = sample.dump()[text_field]
 
-        perturbed_sample_list = self.perturbation.transform(sample)
+        try:
+            perturbed_sample_list = self.perturbation.transform(sample)
+        except FlintError:
+            return sample_text
+
         if not perturbed_sample_list:
             # List is empty because perturbation failed: return original sample
             return sample_text
@@ -467,6 +501,9 @@ class PerturbedDataset(Dataset):
     
     def map(self, function, **kwargs) -> PerturbedDataset:
         return self.__class__(self.dataset.map(function, **kwargs))
+
+    def select(self, indices) -> Dataset:
+        return self.dataset.select(indices)
 
     def perturb(self,
         perturbation: CharacterPerturbation | WordPerturbation | OtherPerturbation,

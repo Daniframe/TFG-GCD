@@ -13,3 +13,5 @@ The repository is organised as follows:
 
 - FINETUNING: code and results for the finetuning phase, including instance-level results
 - EVALUATION: code and results for the evaluation phase
+
+Each folder is divided by model and then by NLP task. 

@@ -11,7 +11,7 @@ Bottleneck @ file:///opt/conda/conda-bld/bottleneck_1657175564434/work
 brotlipy==0.7.0
 cachetools==5.3.0
 catalogue==2.0.8
-certifi==2023.5.7
+certifi==2023.7.22
 cffi @ file:///croot/cffi_1670423208954/work
 charset-normalizer @ file:///tmp/build/80754af9/charset-normalizer_1630003229654/work
 click==7.1.1
